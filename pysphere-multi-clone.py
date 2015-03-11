@@ -34,6 +34,18 @@ def find_folder(name):
         return None
     return None
 
+def find_datastore(name):
+    datastores = con._get_managed_objects(MORTypes.Datastore)
+    try:
+        for mor, datastore_name in datastores.iteritems():
+            print_verbose('Parsing folder %s' % datastore_name)
+            if datastore_name == name:
+                return mor
+    except IndexError:
+        return None
+    return None
+
+
 def run_post_script(name,ip):
     print_verbose('Running post script: %s %s %s' % (post_script,name,ip))
     retcode = subprocess.call([post_script,name,ip])
@@ -67,8 +79,9 @@ parser.add_argument('-6', '--six', required=False, help='Get IPv6 address for VM
 parser.add_argument('-b', '--basename', nargs=1, required=True, help='Basename of the newly deployed VMs', dest='basename', type=str)
 parser.add_argument('-c', '--count', nargs=1, required=False, help='Starting count, the name of the first VM deployed will be <basename>-<count>, the second will be <basename>-<count+1> (default=1)', dest='count', type=int, default=[1])
 parser.add_argument('-f', '--folder', nargs=1, required=False, help='The folder in which the new VMs should reside', dest='folder', type=str)
+parser.add_argument('-d', '--datastore', nargs=1, required=False, help='The datastore for the new VM', dest='datastore', type=str)
 parser.add_argument('-n', '--number', nargs=1, required=False, help='Amount of VMs to deploy (default=1)', dest='amount', type=int, default=[1])
-parser.add_argument('-p', '--post-script', nargs=1, required=False, help='Script to be called after each VM is created and booted. Arguments passed: name ip-address', dest='post_script', type=str)
+parser.add_argument('-p', '--post-script', nargs=1, required=False, help='Path to script to be called after each VM is created and booted. Arguments passed: name ip-address', dest='post_script', type=str)
 parser.add_argument('-r', '--resource-pool', nargs=1, required=False, help='The resource pool in which the new VMs should reside', dest='resource_pool', type=str)
 parser.add_argument('-s', '--server', nargs=1, required=True, help='The vCenter or ESXi server to connect to', dest='server', type=str)
 parser.add_argument('-t', '--template', nargs=1, required=True, help='Template to deploy', dest='template', type=str)
@@ -83,8 +96,11 @@ amount      = args.amount[0]
 basename    = args.basename[0]
 count       = args.count[0]
 folder      = None
+datastore      = None
 if args.folder:
     folder      = args.folder[0]
+if args.datastore:
+    datastore      = args.datastore[0]
 post_script     = None
 if args.post_script: 
     post_script = args.post_script[0]
@@ -136,6 +152,17 @@ if folder is not None:
         sys.exit(1)
     print_verbose('Folder %s found' % folder)
 
+datastore_mor = None
+if datastore is not None:
+    print_verbose('Finding datastore %s' % datastore)
+    datastore_mor = find_datastore(datastore)
+    if datastore_mor is None:
+        print 'ERROR: %s not found' % datastore
+        sys.exit(1)
+    print_verbose('Datastore %s found' % datastore)
+
+
+
 # List with VM name elements for post script processing
 vms_to_ps = []
 # Looping through amount that needs to be created
@@ -146,7 +173,13 @@ for a in range(1,amount+1):
     if find_vm(vm_name):
         print 'ERROR: %s already exists' % vm_name
     else:
-        clone = template_vm.clone(vm_name, True, folder_mor, resource_pool_mor, None, None, False)
+        clone = template_vm.clone(name=vm_name,
+                                  sync_run=True,
+                                  folder=folder,
+                                  resourcepool=resource_pool_mor,
+                                  datastore=datastore_mor,
+                                  host=None,
+                                  power_on=False)
         print_verbose('VM %s created' % vm_name)
         
         print_verbose('Booting VM %s' % vm_name)
