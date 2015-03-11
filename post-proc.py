@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 import re
+import time
 import fabric
 from fabric.api import env, run
 
@@ -51,14 +52,20 @@ def write_local_vm_ssh_config(vm_name, ip, user, key):
 def change_hostname(vm_name):
     run("echo %s > /etc/hostname" % vm_name)
     run("sed -i 's/127\.0\.1\.1/127\.0\.1\.1\t%s/' /etc/hosts" % vm_name)
-    fabric.operations.reboot()
+    do_reboot()
+    time.sleep(60)
 
 
 def syncronize_ntp(ntp_server):
     run("apt-get -y install ntp")
     run("echo '%s' > /etc/ntp.conf" % ntp_conf.format(server=ntp_server))
     run("service ntp restart")
-    fabric.operations.reboot()  # because the service restart doesn't seem to be doing it
+    time.sleep(60)
+
+
+def do_reboot():
+    fabric.operations.reboot(30)
+    fabric.network.disconnect_all()  # because connection problems
 
 if __name__ == "__main__":
     env['host_string'] = USER + '@' + IP
