@@ -59,8 +59,16 @@ def change_hostname(vm_name):
 def syncronize_ntp(ntp_server):
     run("apt-get -y install ntp")
     run("echo '%s' > /etc/ntp.conf" % ntp_conf.format(server=ntp_server))
-    run("service ntp restart")
+    restart_ntp()
     time.sleep(60)
+
+
+def restart_ntp():
+    run("service ntp restart")
+
+
+def verify_ntp():
+    run("ntpq -p")
 
 
 def do_reboot():
@@ -73,4 +81,7 @@ if __name__ == "__main__":
     fabric.tasks.execute(write_local_vm_ssh_config, VMNAME, IP, USER, KEY)
     fabric.tasks.execute(change_hostname, VMNAME)
     fabric.tasks.execute(syncronize_ntp, NTPSERVER)
+    # fabric.tasks.execute(do_reboot)
+    # fabric.tasks.execute(verify_ntp)
     fabric.network.disconnect_all()
+    print "Done!"
